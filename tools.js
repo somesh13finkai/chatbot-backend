@@ -12,10 +12,19 @@ const toolDeclarations = [
     },
     {
         name: 'get_youtube_stats',
-        description: 'Fetches the latest videos and channel statistics for Somesh from YouTube.',
+        description: 'Fetches videos from Somesh\'s YouTube channel. Can be used to find recent videos, or search for specific ones by name/topic.',
         parameters: {
             type: 'OBJECT',
-            properties: {},
+            properties: {
+                query: {
+                    type: 'STRING',
+                    description: 'Optional search query to find specific videos (e.g., "gameplay", "tutorial"). Leave empty to just get the latest videos.'
+                },
+                order: {
+                    type: 'STRING',
+                    description: 'How to sort the results. Options: "date" (newest first), "title" (alphabetical), "viewCount" (most viewed), "relevance" (best match for query). Default is "date".'
+                }
+            },
         },
     }
 ];
@@ -54,7 +63,8 @@ async function getGithubProjects() {
     }
 }
 
-async function getYoutubeStats() {
+async function getYoutubeStats(args = {}) {
+    const { query = "", order = "date" } = args;
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
         return { success: false, error: "YOUTUBE_API_KEY is not configured on the server." };
@@ -83,8 +93,18 @@ async function getYoutubeStats() {
 
         const foundChannelId = searchData.items[0].id.channelId;
 
-        // Now get the latest videos
-        const videoResponse = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&channelId=${foundChannelId}&maxResults=3&order=date&type=video&key=${apiKey}`);
+        // Now get the videos using the parameters
+        let videoUrl = `https://youtube.googleapis.com/youtube/v3/search?part=snippet&channelId=${foundChannelId}&maxResults=5&type=video&key=${apiKey}`;
+
+        if (query) {
+            videoUrl += `&q=${encodeURIComponent(query)}`;
+        }
+
+        const validOrders = ['date', 'rating', 'relevance', 'title', 'viewCount'];
+        const sortOrder = validOrders.includes(order) ? order : 'date';
+        videoUrl += `&order=${sortOrder}`;
+
+        const videoResponse = await fetch(videoUrl);
 
         if (!videoResponse.ok) {
             throw new Error(`YouTube API returned status ${videoResponse.status}`);
@@ -116,7 +136,7 @@ async function executeTool(toolCall) {
     if (name === 'get_github_projects') {
         return await getGithubProjects();
     } else if (name === 'get_youtube_stats') {
-        return await getYoutubeStats();
+        return await getYoutubeStats(args);
     } else {
         return { error: `Unknown tool: ${name}` };
     }
