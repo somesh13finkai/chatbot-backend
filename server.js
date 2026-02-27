@@ -66,8 +66,8 @@ app.post('/api/chat', async (req, res) => {
         ...history,
         { role: 'user', parts: [{ text: currentMessage }] }
       ],
-      tools: [{ functionDeclarations: toolDeclarations }],
       config: {
+        tools: [{ functionDeclarations: toolDeclarations }],
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.7,
       }
@@ -90,8 +90,8 @@ app.post('/api/chat', async (req, res) => {
           { role: 'model', parts: [{ functionCall: call }] },
           { role: 'user', parts: [{ functionResponse: { name: call.name, response: apiResponse } }] }
         ],
-        tools: [{ functionDeclarations: toolDeclarations }],
         config: {
+          tools: [{ functionDeclarations: toolDeclarations }],
           systemInstruction: SYSTEM_INSTRUCTION,
           temperature: 0.7,
         }
