@@ -41,6 +41,8 @@ Here are key details about Somesh:
 If the user asks for Somesh's resume, CV, or contact details, provide a polite response summarizing his qualifications, and YOU MUST append exactly the string "[ACTION:DOWNLOAD_RESUME]" at the very end of your message. This will trigger a download on the frontend. Be conversational, professional, and concise.
 `;
 
+const { toolDeclarations, executeTool } = require('./tools');
+
 app.post('/api/chat', async (req, res) => {
   try {
     const { messages } = req.body;
@@ -58,17 +60,43 @@ app.post('/api/chat', async (req, res) => {
 
     const currentMessage = messages[messages.length - 1].content;
 
-    const response = await ai.models.generateContent({
+    let response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [
         ...history,
         { role: 'user', parts: [{ text: currentMessage }] }
       ],
+      tools: [{ functionDeclarations: toolDeclarations }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.7,
       }
     });
+
+    // Check if the model wants to call a tool
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      const call = response.functionCalls[0];
+      console.log(`Executing tool: ${call.name}`);
+
+      // Execute the tool locally
+      const apiResponse = await executeTool(call);
+
+      // Return the tool's result to the model to get the final natural language answer
+      response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          ...history,
+          { role: 'user', parts: [{ text: currentMessage }] },
+          { role: 'model', parts: [{ functionCall: call }] },
+          { role: 'user', parts: [{ functionResponse: { name: call.name, response: apiResponse } }] }
+        ],
+        tools: [{ functionDeclarations: toolDeclarations }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.7,
+        }
+      });
+    }
 
     res.json({ reply: response.text });
   } catch (error) {
