@@ -63,11 +63,22 @@ async function getGithubProjects() {
     }
 }
 
+// Simple in-memory cache to prevent redundant API calls
+const cache = {};
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 async function getYoutubeStats(args = {}) {
     const { query = "", order = "date" } = args;
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
         return { success: false, error: "YOUTUBE_API_KEY is not configured on the server." };
+    }
+
+    // Check cache first
+    const cacheKey = `yt_${query}_${order}`;
+    if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < CACHE_TTL)) {
+        console.log(`[Cache Hit] Returning cached YouTube data for "${cacheKey}"`);
+        return cache[cacheKey].data;
     }
 
     try {
@@ -118,10 +129,16 @@ async function getYoutubeStats(args = {}) {
             url: `https://www.youtube.com/watch?v=${item.id.videoId}`
         }));
 
-        return {
+        const result = {
             success: true,
             latest_videos: simplifiedVideos
         };
+
+        // Save to cache
+        cache[cacheKey] = { data: result, timestamp: Date.now() };
+        console.log(`[Cache Miss] Cached YouTube data for "${cacheKey}"`);
+
+        return result;
 
     } catch (error) {
         console.error("YouTube Tool Error:", error);

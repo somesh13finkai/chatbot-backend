@@ -51,17 +51,20 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
+    // Truncate: only keep the last 10 messages (5 exchanges) to save API tokens/quota
+    const recentMessages = messages.length > 10 ? messages.slice(-10) : messages;
+
     // Convert messages to the format expected by the GenAI SDK
     // The google-genai SDK uses "user" and "model" as roles
-    const history = messages.slice(0, -1).map(msg => ({
+    const history = recentMessages.slice(0, -1).map(msg => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: msg.content }]
     }));
 
-    const currentMessage = messages[messages.length - 1].content;
+    const currentMessage = recentMessages[recentMessages.length - 1].content;
 
     let response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash-lite',
       contents: [
         ...history,
         { role: 'user', parts: [{ text: currentMessage }] }
@@ -83,7 +86,7 @@ app.post('/api/chat', async (req, res) => {
 
       // Return the tool's result to the model to get the final natural language answer
       response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: [
           ...history,
           { role: 'user', parts: [{ text: currentMessage }] },
