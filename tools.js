@@ -4,7 +4,7 @@ const fetch = require('node-fetch'); // We might need to install this depending 
 const toolDeclarations = [
     {
         name: 'get_github_projects',
-        description: 'Fetches the latest public repositories for Somesh from GitHub.',
+        description: 'Fetches the latest public repositories for the user from GitHub.',
         parameters: {
             type: 'OBJECT',
             properties: {},
@@ -12,7 +12,7 @@ const toolDeclarations = [
     },
     {
         name: 'get_youtube_stats',
-        description: 'Fetches videos from Somesh\'s YouTube channel. Can be used to find recent videos, or search for specific ones by name/topic.',
+        description: 'Fetches videos from the user\'s YouTube channel. Can be used to find recent videos, or search for specific ones by name/topic.',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -33,8 +33,12 @@ const toolDeclarations = [
 
 async function getGithubProjects() {
     try {
+        const username = process.env.GITHUB_USERNAME;
+        if (!username) {
+            return { success: false, error: "GITHUB_USERNAME is not configured on the server." };
+        }
         // Make sure we have a User-Agent header, GitHub API requires it
-        const response = await fetch('https://api.github.com/users/someshshukla/repos?sort=updated&per_page=5', {
+        const response = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=5`, {
             headers: {
                 'User-Agent': 'PortfolioChatbot'
             }
@@ -82,15 +86,13 @@ async function getYoutubeStats(args = {}) {
     }
 
     try {
-        const channelId = 'UCr0rLgE2uIeD2YfH-vFwEwg'; // This is roughly the channel ID format, we might need to find yours specifically
-        // Wait, the user linked 'https://www.youtube.com/@shuklazi'. 
-        // A better approach if we don't have the exact channel ID is to search for the channel first, 
-        // but for now let's construct a general request, or ask the user for their channel ID.
-        // Let's use search API to find the channel ID based on the handle, or just search for recent videos from that handle if possible.
-        // Actually, fetching from a handle directly requires resolving it or knowing the ID. Needs a channel ID.
+        const handle = process.env.YOUTUBE_HANDLE;
+        if (!handle) {
+            return { success: false, error: "YOUTUBE_HANDLE is not configured on the server." };
+        }
 
-        // Let's assume we need to find the channel ID first, but to keep it light, let's just search for videos by the handle
-        const searchResponse = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent('@shuklazi')}&type=channel&key=${apiKey}`);
+        
+        const searchResponse = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(handle)}&type=channel&key=${apiKey}`);
 
         if (!searchResponse.ok) {
             throw new Error(`YouTube API returned status ${searchResponse.status}`);
@@ -104,7 +106,7 @@ async function getYoutubeStats(args = {}) {
 
         const foundChannelId = searchData.items[0].id.channelId;
 
-        // Now get the videos using the parameters
+        
         let videoUrl = `https://youtube.googleapis.com/youtube/v3/search?part=snippet&channelId=${foundChannelId}&maxResults=5&type=video&key=${apiKey}`;
 
         if (query) {
@@ -134,7 +136,7 @@ async function getYoutubeStats(args = {}) {
             latest_videos: simplifiedVideos
         };
 
-        // Save to cache
+        
         cache[cacheKey] = { data: result, timestamp: Date.now() };
         console.log(`[Cache Miss] Cached YouTube data for "${cacheKey}"`);
 
@@ -146,7 +148,7 @@ async function getYoutubeStats(args = {}) {
     }
 }
 
-// --- Main Execution Logic ---
+
 async function executeTool(toolCall) {
     const { name, args } = toolCall;
 
